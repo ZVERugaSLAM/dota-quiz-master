@@ -4,6 +4,7 @@ import json
 import os
 import random
 import gspread
+import re
 from google.oauth2.service_account import Credentials
 from dotenv import load_dotenv
 from datetime import datetime
@@ -132,7 +133,7 @@ def generate_llm_quiz_rest(topic_name, category_type, custom_prompt, history, cu
     
     {custom_str}
     
-    Поверни результат СУВОРО у форматі JSON.
+    Поверни результат СУВОРО у форматі JSON (без маркдаун розмітки, лише сам об'єкт JSON).
     {{
         "question": "текст питання (до 250 символів)",
         "options": ["варіант 1", "варіант 2", "варіант 3", "варіант 4"],
@@ -142,10 +143,17 @@ def generate_llm_quiz_rest(topic_name, category_type, custom_prompt, history, cu
     Зверни увагу: correct_index - це ціле число від 0 до 3. Відповіді мають бути українською мовою.
     """
     
+    safety_settings = [
+        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+    ]
+
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "tools": [{"googleSearch": {}}],
-        "generationConfig": {"responseMimeType": "application/json"}
+        "safetySettings": safety_settings
     }
     headers = {"Content-Type": "application/json"}
     
@@ -153,10 +161,27 @@ def generate_llm_quiz_rest(topic_name, category_type, custom_prompt, history, cu
         response = requests.post(url, json=payload, headers=headers)
         response.raise_for_status()
         data = response.json()
+        
+        if 'candidates' not in data:
+            st.error(f"Сервер повернув непередбачену відповідь (фільтр або помилка). Деталі: {json.dumps(data, ensure_ascii=False)}")
+            return None
+            
         raw_text = data['candidates'][0]['content']['parts'][0]['text']
-        return json.loads(raw_text)
+        
+        # Витягуємо JSON за допомогою регулярного виразу, ігноруючи текст до або після нього
+        json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
+        if json_match:
+            clean_json = json_match.group(0)
+            return json.loads(clean_json)
+        else:
+            st.error(f"Не вдалося знайти структуру JSON у відповіді моделі. Відповідь: {raw_text}")
+            return None
+            
+    except requests.exceptions.RequestException as e:
+        st.error(f"HTTP Помилка запиту до API: {e}")
+        return None
     except Exception as e:
-        st.error(f"Помилка генерації через API: {e}")
+        st.error(f"Помилка обробки результату: {e}")
         return None
 
 def check_password():
