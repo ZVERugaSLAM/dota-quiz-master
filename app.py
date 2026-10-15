@@ -75,7 +75,7 @@ def get_topic_history(topic_name):
 def save_to_history(topic_name, question, options, correct_index, explanation):
     if sheet is None: return
     try:
-        sheet.append_row([topic_name, question, json.dumps(options), correct_index, explanation])
+        sheet.append_row([topic_name, question, json.dumps(options, ensure_ascii=False), correct_index, explanation])
     except Exception as e:
         st.error(f"Помилка збереження в історію: {e}")
 
