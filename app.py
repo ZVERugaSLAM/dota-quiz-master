@@ -6,6 +6,7 @@ import random
 import gspread
 from google.oauth2.service_account import Credentials
 from dotenv import load_dotenv
+from datetime import datetime
 
 load_dotenv()
 
@@ -93,14 +94,15 @@ def clear_topic_history(topic_name):
         st.error(f"Помилка видалення: {e}")
         return False
 
-@st.cache_data(ttl=3600)
+@st.cache_data
 def fetch_dota_heroes():
     try:
-        response = requests.get("https://api.opendota.com/api/heroStats")
-        if response.status_code == 200:
-            return response.json()
+        with open("heroes.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        st.error("Файл heroes.json не знайдено! Будь ласка, створіть його в корені репозиторію.")
     except Exception as e:
-        st.error(f"Помилка завантаження героїв: {e}")
+        st.error(f"Помилка завантаження локальних героїв: {e}")
     return []
 
 def generate_llm_quiz_rest(topic_name, category_type, custom_prompt, history):
@@ -112,11 +114,14 @@ def generate_llm_quiz_rest(topic_name, category_type, custom_prompt, history):
     
     history_str = "\n".join(f"- {q}" for q in history) if history else "Поки що немає."
     custom_str = f"ЗАПИТ ВІД КОРИСТУВАЧА: {custom_prompt}" if custom_prompt else ""
+    current_date = datetime.now().strftime("%Y-%m-%d")
     
     if category_type == "hero":
         instruction = f"Створи одне складне, неочевидне питання для вікторини з фокусом на героя {topic_name}. ДОЗВОЛЕНІ ТЕМИ: глибока механіка здібностей, базова шкода/характеристики, взаємодія з предметами та іншими героями, таймінги. КАТЕГОРИЧНО ЗАБОРОНЕНО: лор."
     else:
         instruction = f"Створи одне складне, неочевидне питання для вікторини про ігрову об'єкт/механіку: {topic_name}. Фокус має бути на точних цифрах (таймінги появи, формули шкоди/золота, час дії ефектів) або на специфічних механіках взаємодії гравців з цим об'єктом. КАТЕГОРИЧНО ЗАБОРОНЕНО: лор."
+        
+    instruction += f"\nОБОВ'ЯЗКОВА УМОВА: Використовуй лише найновіші, актуальні механіки та цифри останнього глобального патчу Dota 2 (станом на {current_date}). КАТЕГОРИЧНО ЗАБОРОНЕНО використовувати застарілі механіки, старі ефекти здібностей, або цифри, які були змінені чи видалені в попередніх патчах."
     
     prompt = f"""
     Ти хардкорний експерт з Dota 2. 
