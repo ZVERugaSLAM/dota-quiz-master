@@ -297,6 +297,5 @@ if check_password():
                     st.success("✅ Вікторина успішно опублікована та збережена в історію!")
                     st.balloons()
                     st.session_state.quiz_data = {"question": "", "options": ["", "", "", ""], "correct_index": 0, "explanation": ""}
-                    st.session_state.correct_radio = "Варіант 1"
                 else:
                     st.error(f"Помилка Telegram API: {res.get('description')}")
