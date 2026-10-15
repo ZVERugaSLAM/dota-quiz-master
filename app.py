@@ -226,6 +226,15 @@ if check_password():
                 history = get_topic_history(selected_topic)
                 llm_data = generate_llm_quiz_rest(selected_topic, cat_type, custom_prompt_input, history)
                 if llm_data:
+                    original_options = llm_data["options"]
+                    original_correct_idx = llm_data.get("correct_index", 0)
+                    
+                    paired_options = [(text, i == original_correct_idx) for i, text in enumerate(original_options)]
+                    random.shuffle(paired_options)
+                    
+                    llm_data["options"] = [pair[0] for pair in paired_options]
+                    llm_data["correct_index"] = next(i for i, pair in enumerate(paired_options) if pair[1])
+                    
                     st.session_state.quiz_data = llm_data
                     st.rerun()
                     
