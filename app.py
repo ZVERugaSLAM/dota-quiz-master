@@ -233,9 +233,11 @@ if check_password():
                     random.shuffle(paired_options)
                     
                     llm_data["options"] = [pair[0] for pair in paired_options]
-                    llm_data["correct_index"] = next(i for i, pair in enumerate(paired_options) if pair[1])
+                    new_correct_idx = next(i for i, pair in enumerate(paired_options) if pair[1])
+                    llm_data["correct_index"] = new_correct_idx
                     
                     st.session_state.quiz_data = llm_data
+                    st.session_state.correct_radio = f"Варіант {new_correct_idx + 1}"
                     st.rerun()
                     
         st.divider()
@@ -295,5 +297,6 @@ if check_password():
                     st.success("✅ Вікторина успішно опублікована та збережена в історію!")
                     st.balloons()
                     st.session_state.quiz_data = {"question": "", "options": ["", "", "", ""], "correct_index": 0, "explanation": ""}
+                    st.session_state.correct_radio = "Варіант 1"
                 else:
                     st.error(f"Помилка Telegram API: {res.get('description')}")
