@@ -105,7 +105,7 @@ def fetch_dota_heroes():
         st.error(f"Помилка завантаження локальних героїв: {e}")
     return []
 
-def generate_llm_quiz_rest(topic_name, category_type, custom_prompt, history):
+def generate_llm_quiz_rest(topic_name, category_type, custom_prompt, history, current_patch):
     if not GEMINI_API_KEY:
         st.error("API ключ Gemini не знайдено!")
         return None
@@ -119,9 +119,9 @@ def generate_llm_quiz_rest(topic_name, category_type, custom_prompt, history):
     if category_type == "hero":
         instruction = f"Створи одне складне, неочевидне питання для вікторини з фокусом на героя {topic_name}. ДОЗВОЛЕНІ ТЕМИ: глибока механіка здібностей, базова шкода/характеристики, взаємодія з предметами та іншими героями, таймінги. КАТЕГОРИЧНО ЗАБОРОНЕНО: лор."
     else:
-        instruction = f"Створи одне складне, неочевидне питання для вікторини про ігрову об'єкт/механіку: {topic_name}. Фокус має бути на точних цифрах (таймінги появи, формули шкоди/золота, час дії ефектів) або на специфічних механіках взаємодії гравців з цим об'єктом. КАТЕГОРИЧНО ЗАБОРОНЕНО: лор."
+        instruction = f"Створи одне складне, неочевидне питання для вікторини про ігровий об'єкт/механіку: {topic_name}. Фокус має бути на точних цифрах (таймінги появи, формули шкоди/золота, час дії ефектів) або на специфічних механіках взаємодії гравців з цим об'єктом. КАТЕГОРИЧНО ЗАБОРОНЕНО: лор."
         
-    instruction += f"\nОБОВ'ЯЗКОВА УМОВА: Використовуй лише найновіші, актуальні механіки та цифри останнього глобального патчу Dota 2 (станом на {current_date}). КАТЕГОРИЧНО ЗАБОРОНЕНО використовувати застарілі механіки, старі ефекти здібностей, або цифри, які були змінені чи видалені в попередніх патчах."
+    instruction += f"\nОБОВ'ЯЗКОВА УМОВА: Спочатку використай інтегрований Google Search для перевірки статусу '{topic_name}' у патчі {current_patch} (станом на {current_date}). Перевіряй на Dota 2 Wiki або Liquipedia, чи не був предмет або механіка видалені (cycled out / removed / reworked). Використовуй лише найновіші, актуальні механіки та цифри патчу {current_patch}. КАТЕГОРИЧНО ЗАБОРОНЕНО використовувати застарілі механіки, старі ефекти здібностей, або цифри, які були змінені чи видалені в попередніх патчах."
     
     prompt = f"""
     Ти хардкорний експерт з Dota 2. 
@@ -144,6 +144,7 @@ def generate_llm_quiz_rest(topic_name, category_type, custom_prompt, history):
     
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
+        "tools": [{"googleSearch": {}}],
         "generationConfig": {"responseMimeType": "application/json"}
     }
     headers = {"Content-Type": "application/json"}
@@ -202,6 +203,8 @@ if check_password():
         category = st.radio("Тематика вікторини:", ("🦸‍♂️ Герої", "🌍 Глобальні механіки"))
         st.divider()
         
+        current_patch_input = st.text_input("📌 Поточний патч", value="7.41f", help="Вкажіть актуальний патч для генерації питань")
+        
         if category == "🦸‍♂️ Герої":
             if heroes:
                 hero_names = [h["localized_name"] for h in heroes]
@@ -227,9 +230,9 @@ if check_password():
         custom_prompt_input = st.text_area("Кастомний запит (опціонально)", placeholder="Додаткові побажання до питання", max_chars=150)
         
         if selected_topic and st.button("✨ Згенерувати питання", use_container_width=True):
-            with st.spinner("LLM аналізує дані..."):
+            with st.spinner("LLM аналізує дані (з урахуванням Google Search)..."):
                 history = get_topic_history(selected_topic)
-                llm_data = generate_llm_quiz_rest(selected_topic, cat_type, custom_prompt_input, history)
+                llm_data = generate_llm_quiz_rest(selected_topic, cat_type, custom_prompt_input, history, current_patch_input)
                 if llm_data:
                     original_options = llm_data["options"]
                     original_correct_idx = llm_data.get("correct_index", 0)
